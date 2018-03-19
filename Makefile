@@ -1,68 +1,32 @@
-ME=$(USER)
-DOCKERHUB_VER=v0.1
+#!make
 
-#all: build init up
 all: init up
 
-
 init:
-	echo "Retrieving databases - for naturalist and mediaserver"
-	./get_naturalist-db_schema.sh
+	mkdir -p initdbmedia initdbnf srv certs
+	echo "Dont forget to put your certs file in the certs directory now!"
+	echo "Retrieving media files"
+	scp naturalist:backups/media-files.tgz ./srv
+	cd srv && tar xvfz media-files.tgz && rm media-files.tgz
+	echo "Retrieving databases - for naturalist ..."
+	scp naturalist:backups/taxonpages_v2.sql ./initdbnf/taxonpages_v2.sql
+	#scp admin@naturalist.nrm.se:backups/mysql-taxonpages_v2.2018_03_19.sql.gz .
+	#gunzip mysql-taxonpages_v2.2018_03_19.sql.gz
+	#mv mysql-taxonpages_v2.2018_03_19.sql initdbnf/taxonpages_v2.sql
+	echo "... and for mediaserver"
+	scp naturalist:backups/mediaserver_20180319.sql ./initdbmedia/nf_media.sql
+	scp naturalist:backups/update-admin_config.sql ./initdbmedia/update-admin_config.sql
 
-	echo "set up database taxonpages_v2"
-	docker-compose up -d db.nf
-	#echo "Installing app file (.war)"
-	#./get_enhanced-naturalist_war.sh
-	#echo "For standalone -Installing the maps"
-	#./get_occurance-map_files.sh
-	echo "Installing nginx certs and DINA favicon"
-	./get_nginx_certs.sh
-	
-build: fetch-sh
-	echo "fetching app file (.war)"
-	./get_enhanced-naturalist_war.sh
-	echo "builds"	
-	@docker build -t dina/naturalist_enhanced:${DOCKERHUB_VER} wildfly-custom
-
-	echo "Installing nginx certs and DINA favicon"
-	./get_nginx_certs.sh
-
-
-fetch-sh:
-	@curl --progress -L -s -o wait-for-it.sh \
-		https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh && \
-		chmod +x wait-for-it.sh
-	@test -f wildfly-custom/wait-for-it.sh || \
-		mv wait-for-it.sh wildfly-custom/
-
-release:
-	docker push  dina/naturalist_enhanced:${DOCKERHUB_VER}
+clean:
+	rm -rf initdbmedia initdbnf #srv
 
 up:
-	docker-compose up -d db.nf
-	sleep 15
-	docker-compose up -d as
-	sleep 10
+	@docker-compose up -d
 
-	docker-compose up -d
+down:
+	@docker-compose down
 
-	@echo "Local:: Please make sure you have beta-naturforskaren.dina-web.net  in your /etc/hosts!"
-	sleep 15
-
-	#echo "Opening app!"
-	#firefox https://beta-naturforskaren.dina-web.net/nf-naturalist/&
-
-
-clean: stop rm
-	sudo chown -R $(ME):$(ME) nginx-conf nginx-html nginx-certs nginx-logs
-	sudo chown -R $(ME):$(ME) mysql_nf-datadir mysql_nf-shr mysql_nf-autoload mysql_nf-conf.d
-
-stop:
-	docker-compose stop
-
-rm:
-	docker-compose rm -vf
-
-ps: 
-	docker-compose ps
+browse:
+	firefox https://beta-naturforskaren.dina-web.net/nf-naturalist/ &
+	firefox https://beta-media.dina-web.net/MediaServerRestEasy/ &
 
